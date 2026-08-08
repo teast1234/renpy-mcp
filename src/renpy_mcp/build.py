@@ -1,4 +1,4 @@
-"""Build tools: compile_project, lint_project.
+"""Build tools: compile_project, lint_project, check_project, manage_saves.
 
 Wraps Ren'Py CLI commands via subprocess.
 """
@@ -7,6 +7,7 @@ import subprocess
 import re
 import os
 import glob as glob_mod
+import time
 from .config import get_python_exe, get_renpy_script
 
 
@@ -44,6 +45,154 @@ def lint_project(project_path: str) -> dict:
     return _run_renpy_command(project_path, "lint")
 
 
+def check_project(project_path: str, force: bool = True) -> dict:
+    """Run compile then lint in one call. Returns combined structured result.
+
+    If compile fails, returns immediately with compile errors (no point linting
+    broken syntax). If compile passes, runs lint and merges warnings.
+
+    Args:
+        project_path: Absolute path to the Ren'Py project root directory.
+        force: If True, clear .rpyc cache before compiling (default True).
+
+    Returns:
+        {
+            "ok": bool,
+            "compile_errors": [...],
+            "lint_warnings": [...],
+            "raw_output": str,
+        }
+    """
+    compile_result = compile_project(project_path, force=force)
+    if not compile_result.get("ok"):
+        return {
+            "ok": False,
+            "compile_errors": compile_result.get("errors", []),
+            "lint_warnings": [],
+            "raw_output": compile_result.get("raw_output", ""),
+            "note": "Compile failed, lint skipped.",
+        }
+
+    lint_result = lint_project(project_path)
+    all_ok = lint_result.get("ok", True)
+    return {
+        "ok": all_ok,
+        "compile_errors": [],
+        "lint_warnings": lint_result.get("warnings", []),
+        "raw_output": compile_result.get("raw_output", "") + "\n" + lint_result.get("raw_output", ""),
+    }
+
+
+# ── Save state management ─────────────────────────────────────────────
+
+_STALE_PATTERNS = ["_reload-*", "_tracesave-*"]
+
+
+def manage_saves(project_path: str, action: str = "list") -> dict:
+    """List, clear, or clear-stale Ren'Py save files.
+
+    Ren'Py stores saves under game/saves/. Stale saves (_reload-*, _tracesave-*)
+    can retain old call stacks that cause 'Could not find return label' errors
+    after script refactors.
+
+    Args:
+        project_path: Absolute path to the Ren'Py project root directory.
+        action: One of:
+            - "list": list all save files with size + mtime
+            - "clear": delete ALL save files (game restarts from 'start')
+            - "clear_stale": delete only _reload-* and _tracesave-* files
+
+    Returns:
+        {
+            "ok": bool,
+            "action": str,
+            "saves": [{name, size, mtime}],   # for "list"
+            "deleted": [name],               # for clear/clear_stale
+            "message": str,
+        }
+    """
+    saves_dir = os.path.join(project_path, "game", "saves")
+    if not os.path.isdir(saves_dir):
+        return {
+            "ok": True,
+            "action": action,
+            "saves": [],
+            "deleted": [],
+            "message": "No saves directory found (no saves yet).",
+        }
+
+    if action == "list":
+        saves = _list_save_files(saves_dir)
+        return {
+            "ok": True,
+            "action": "list",
+            "saves": saves,
+            "deleted": [],
+            "message": f"Found {len(saves)} save file(s).",
+        }
+
+    if action == "clear":
+        deleted = _delete_save_files(saves_dir, pattern="*")
+        return {
+            "ok": True,
+            "action": "clear",
+            "saves": [],
+            "deleted": deleted,
+            "message": f"Deleted {len(deleted)} save file(s). Game will restart from 'start'.",
+        }
+
+    if action == "clear_stale":
+        deleted = []
+        for pat in _STALE_PATTERNS:
+            deleted.extend(_delete_save_files(saves_dir, pattern=pat))
+        return {
+            "ok": True,
+            "action": "clear_stale",
+            "saves": [],
+            "deleted": deleted,
+            "message": f"Deleted {len(deleted)} stale save file(s).",
+        }
+
+    return {
+        "ok": False,
+        "action": action,
+        "saves": [],
+        "deleted": [],
+        "message": f"Unknown action: {action}. Use list / clear / clear_stale.",
+    }
+
+
+def _list_save_files(saves_dir: str) -> list[dict]:
+    """List all files in saves dir with metadata."""
+    saves = []
+    for f in sorted(os.listdir(saves_dir)):
+        full = os.path.join(saves_dir, f)
+        if not os.path.isfile(full):
+            continue
+        stat = os.stat(full)
+        saves.append({
+            "name": f,
+            "size": stat.st_size,
+            "mtime": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(stat.st_mtime)),
+        })
+    return saves
+
+
+def _delete_save_files(saves_dir: str, pattern: str = "*") -> list[str]:
+    """Delete files matching glob pattern in saves dir. Returns deleted names."""
+    deleted = []
+    for f in glob_mod.glob(os.path.join(saves_dir, pattern)):
+        if not os.path.isfile(f):
+            continue
+        name = os.path.basename(f)
+        try:
+            os.remove(f)
+            deleted.append(name)
+        except OSError:
+            pass
+    return deleted
+
+
 def _run_renpy_command(project_path: str, command: str) -> dict:
     """Execute a Ren'Py CLI command and parse output."""
     try:
@@ -71,8 +220,12 @@ def _run_renpy_command(project_path: str, command: str) -> dict:
         out = result.stdout.decode("utf-8", errors="replace")
         err = result.stderr.decode("utf-8", errors="replace")
     except Exception:
-        out = result.stdout.decode("gbk", errors="replace")
-        err = result.stderr.decode("gbk", errors="replace")
+        # Fallback to system's preferred encoding (Windows may use cp936/gbk,
+        # macOS/Linux typically use utf-8 already handled above)
+        import locale
+        pref = locale.getpreferredencoding(False) or "utf-8"
+        out = result.stdout.decode(pref, errors="replace")
+        err = result.stderr.decode(pref, errors="replace")
     output = out + "\n" + err
 
     if command == "compile":

@@ -1,12 +1,34 @@
 [project]
 name = "renpy-mcp"
-version = "0.2.0"
+version = "0.3.0"
 description = "Ren'Py MCP Server - AI Agent bridge for Ren'Py visual novel development"
+readme = "README.md"
+license = {text = "MIT"}
 requires-python = ">=3.12"
+authors = [
+    {name = "Muanchen2"},
+]
+keywords = ["renpy", "mcp", "ai", "visual-novel", "model-context-protocol"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Games/Entertainment",
+    "Topic :: Software Development :: Libraries",
+]
 dependencies = [
-    "mcp>=1.0.0",
+    "mcp>=1.0.0,<2.0.0",
     "Pillow>=10.0.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/Muanchen2/renpy-mcp"
+Repository = "https://github.com/Muanchen2/renpy-mcp"
+Issues = "https://github.com/Muanchen2/renpy-mcp/issues"
 
 [project.scripts]
 renpy-mcp = "renpy_mcp.server:main"
@@ -14,3 +36,6 @@ renpy-mcp = "renpy_mcp.server:main"
 [build-system]
 requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]

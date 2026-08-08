@@ -8,6 +8,7 @@ Also auto-detects CJK text and configures a compatible font automatically.
 
 import os
 import re
+import sys
 import shutil
 from .build import compile_project
 
@@ -28,9 +29,34 @@ _NON_CJK_FONTS = {
     "Roboto-Regular.ttf", "Roboto-Bold.ttf", "SourceSansPro-Regular.ttf",
 }
 
-_CJK_FONT_CANDIDATES = ["simhei.ttf", "msyh.ttc", "simsun.ttc", "simkai.ttf"]
+_CJK_FONT_CANDIDATES = [
+    # Windows
+    "simhei.ttf", "msyh.ttc", "simsun.ttc", "simkai.ttf",
+    # macOS
+    "PingFang.ttc", "STHeiti Light.ttc", "STHeiti Medium.ttc", "Hiragino Sans GB.ttc",
+    # Linux (Noto CJK / WenQuanYi)
+    "NotoSansCJK-Regular.ttc", "NotoSansCJKsc-Regular.otf", "wqy-microhei.ttc", "wqy-zenhei.ttc",
+]
 
-_WINDOWS_FONTS_DIR = r"C:\Windows\Fonts"
+
+def _get_font_dirs() -> list[str]:
+    """Return font directories for the current platform."""
+    home = os.path.expanduser("~")
+    if sys.platform == "win32":
+        return [r"C:\Windows\Fonts"]
+    elif sys.platform == "darwin":
+        return [
+            "/System/Library/Fonts",
+            "/Library/Fonts",
+            os.path.join(home, "Library", "Fonts"),
+        ]
+    else:  # Linux
+        return [
+            "/usr/share/fonts",
+            "/usr/local/share/fonts",
+            os.path.join(home, ".fonts"),
+            os.path.join(home, ".local", "share", "fonts"),
+        ]
 
 
 def _has_cjk(text: str) -> bool:
@@ -47,7 +73,7 @@ def _read_gui_fonts(project_path: str) -> list[str]:
     if not os.path.isfile(gui_path):
         return []
     try:
-        with open(gui_path, "r", encoding="utf-8") as f:
+        with open(gui_path, "r", encoding="utf-8-sig") as f:
             content = f.read()
     except (IOError, UnicodeDecodeError):
         return []
@@ -69,10 +95,13 @@ def _setup_cjk_font(project_path: str) -> dict | None:
     font_name = None
     font_source = None
     for candidate in _CJK_FONT_CANDIDATES:
-        src = os.path.join(_WINDOWS_FONTS_DIR, candidate)
-        if os.path.isfile(src):
-            font_name = candidate
-            font_source = src
+        for font_dir in _get_font_dirs():
+            src = os.path.join(font_dir, candidate)
+            if os.path.isfile(src):
+                font_name = candidate
+                font_source = src
+                break
+        if font_name:
             break
 
     if not font_name:
@@ -85,8 +114,10 @@ def _setup_cjk_font(project_path: str) -> dict | None:
 
     gui_path = os.path.join(game_dir, "gui.rpy")
     try:
-        with open(gui_path, "r", encoding="utf-8") as f:
-            gui_content = f.read()
+        with open(gui_path, "rb") as f:
+            raw = f.read()
+        had_bom = raw.startswith(b"\xef\xbb\xbf")
+        gui_content = raw.decode("utf-8-sig")
     except (IOError, UnicodeDecodeError):
         return {"warning": f"Font {font_name} copied but gui.rpy unreadable."}
 
@@ -102,7 +133,7 @@ def _setup_cjk_font(project_path: str) -> dict | None:
             gui_content = gui_content.replace(old_font, font_name)
 
     try:
-        with open(gui_path, "w", encoding="utf-8") as f:
+        with open(gui_path, "w", encoding="utf-8-sig" if had_bom else "utf-8") as f:
             f.write(gui_content)
     except IOError:
         return {"warning": f"Font {font_name} copied but gui.rpy update failed."}
@@ -123,36 +154,48 @@ def exec_rpy(
     code: str,
     position: str = "end",
     auto_compile: bool = True,
+    auto_cjk_font: bool = False,
 ) -> dict:
     """Inject arbitrary Ren'Py code into a project file.
-
-    Automatically detects CJK text and sets up a compatible font if needed.
 
     Args:
         project_path: Root directory of the Ren'Py project.
         file: Target .rpy file path (relative to project_path).
         code: Raw Ren'Py script code to inject.
         position: "end" / "top" / "inside:<label>" / "after:<label>" / "before:<label>" /
-            "replace:<old_text>" (replace first match with code)
+            "replace:<old_text>" (replace first match with code) /
+            "replace_all:<old_text>" (replace ALL matches with code)
         auto_compile: Run compile after writing (default True).
+        auto_cjk_font: If True and code contains CJK text, auto-configure a CJK
+            font in gui.rpy. Defaults to False to avoid surprising side effects.
 
     Returns:
-        dict with {ok, message, compile_result, font_setup?}
+        dict with {ok, message, compile_result, font_setup?, cjk_warning?}
     """
     target_path = os.path.join(project_path, file)
 
-    # ── CJK auto-setup ──
+    # ── CJK detection (warn by default, only act if auto_cjk_font=True) ──
     font_info = None
+    cjk_warning = None
     if _has_cjk(code):
-        font_info = _setup_cjk_font(project_path)
+        if auto_cjk_font:
+            font_info = _setup_cjk_font(project_path)
+        else:
+            cjk_warning = (
+                "Code contains CJK text. Ensure gui.rpy uses a CJK-compatible "
+                "font (e.g. simhei.ttf) or pass auto_cjk_font=True to auto-configure."
+            )
 
     # ── Read existing (auto-create file if not found) ──
     existing = ""
     created = False
+    had_bom = False
     if os.path.isfile(target_path):
         try:
-            with open(target_path, "r", encoding="utf-8") as f:
-                existing = f.read()
+            with open(target_path, "rb") as f:
+                raw = f.read()
+            had_bom = raw.startswith(b"\xef\xbb\xbf")
+            existing = raw.decode("utf-8-sig")
         except (IOError, UnicodeDecodeError) as e:
             return {"ok": False, "message": f"Failed to read file: {e}", "compile_result": None}
     else:
@@ -179,6 +222,12 @@ def exec_rpy(
         new_content = _insert_before_label(existing, code, label_name)
         if new_content is None:
             return {"ok": False, "message": f"Label '{label_name}' not found in {file}", "compile_result": None}
+    elif position.startswith("replace_all:"):
+        old_text = position[len("replace_all:"):]
+        count = existing.count(old_text)
+        if count == 0:
+            return {"ok": False, "message": f"Text not found in {file}: {old_text[:80]}...", "compile_result": None}
+        new_content = existing.replace(old_text, code)
     elif position.startswith("replace:"):
         old_text = position[len("replace:"):]
         if old_text not in existing:
@@ -187,9 +236,9 @@ def exec_rpy(
     else:
         return {"ok": False, "message": f"Unknown position: {position}", "compile_result": None}
 
-    # ── Write ──
+    # ── Write (preserve BOM if original had it) ──
     try:
-        with open(target_path, "w", encoding="utf-8") as f:
+        with open(target_path, "w", encoding="utf-8-sig" if had_bom else "utf-8") as f:
             f.write(new_content)
     except IOError as e:
         return {"ok": False, "message": f"Failed to write file: {e}", "compile_result": None}
@@ -202,7 +251,9 @@ def exec_rpy(
         elif font_info.get("warning"):
             extra_parts.append(font_info["warning"])
 
-    if position.startswith("replace:"):
+    if position.startswith("replace_all:"):
+        msg = f"Replaced all occurrences in {file}."
+    elif position.startswith("replace:"):
         msg = f"Text replaced in {file}."
     elif created:
         msg = f"File created and code written to {file}."
@@ -221,6 +272,8 @@ def exec_rpy(
     result = {"ok": True, "message": msg, "compile_result": compile_result}
     if font_info:
         result["font_setup"] = font_info
+    if cjk_warning:
+        result["cjk_warning"] = cjk_warning
 
     return result
 

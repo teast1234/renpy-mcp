@@ -1,0 +1,1578 @@
+样式特性(property) — Ren'Py 中文文档
+      
+      
+      
+      
+      
+
+  
+    
+      
+      
+      
+      
+      
+      
+      
+    
+    
+    
+    
+     
+
+
+ 
+  
+
+    
+
+    
+
+      
+
+        
+
+          
+
+  
+      
+
+
+      
+样式特性(property)
+
+      
+
+               文档捉虫
+      
+
+  
+  
+
+
+          
+
+           
+
+             
+  
+
+
+# 样式特性(property)
+
+
+(译者注：property一词通常翻译成“属性”。鉴于文档中的attribute也可以翻译成“属性”。为了防止混淆，将property翻译为“特性”。)
+
+
+样式特性与 样式 相关，控制可视组件的显示方式。样式特性出现时可以没有前缀，这种情况下样式特性应用于所有状态的可视组件；带前缀的样式特性则限制了应用组件的状态。
+
+
+## 样式特性前缀
+
+
+增加前缀可以从样式特性名称上就能看出作用于哪些状态的可视组件，比如得到焦点或者被选择状态。例如，某个按钮可以在鼠标悬停其上的时候改变颜色，或者提示按钮对应的选项就是目前使用的选项。
+
+
+可视组件总共有5种状态可用作样式特性前缀。
+
+
+insensitive
+    
+当用户与无法与可视组件互动时使用。
+
+
+idle
+    
+当可视组件即没有获得焦点也没有被选中时使用。
+
+
+hover
+    
+当可视组件获得焦点但没有被选中时使用。
+
+
+selected_idle
+    
+当可视组件未获得焦点但被选中时使用。
+
+
+selected_hover
+    
+当可视组件获得焦点且被选中时使用。
+
+
+按钮和条类可视组件(包括他们的各类变种)在收到事件消息后，会更新自身和子组件的状态。例如，当用户把鼠标移动到某个未被选择的按钮上方，按钮及其子组件都会把状态改为hover。
+
+
+样式特性前缀名允许外延。这里是一个前缀状态及其能外延的所有可视组件状态映射关系。
+
+
+prefix
+
+
+states implied by prefix
+
+
+(no prefix)
+
+
+insensitive, idle, hover, selected_idle, selected_hover
+
+
+`idle_`
+
+
+idle, selected_idle
+
+
+`hover_`
+
+
+hover, selected_hover
+
+
+`selected_`
+
+
+selected_idle, selected_hover
+
+
+`insensitive_`
+
+
+insensitive
+
+
+`selected_idle_`
+
+
+selected_idle
+
+
+`selected_hover_`
+
+
+selected_hover
+
+
+`selected_insensitive_`
+
+
+selected_insensitive
+
+
+我们可以使用一个文本按钮实际演示一下。文本按钮使用两个默认的样式： `button` 用于按钮本身， `button_text` 用于按钮上的文本。 `background` 样式特性设置按钮的背景， `color` 特性设置文本颜色：
+
+
+```
+# 当按钮为insensitive状态时，背景为灰色；hover状态是，背景为浅蓝；
+# 其他情况下，背景为深蓝。
+style button:
+    background "#006"
+    insensitive_background "#444"
+    hover_background "#00a"
+
+# 当按钮为selected状态时，文本为黄色；其他情况下为白色。
+style button_text:
+    color "#fff"
+    selected_color "#ff0"
+
+```
+
+
+## 样式特性的值
+
+
+每种样式特性对应每种特定类型的数据。许多特性值都是标准的python数据类型，有一些是novel类型。这里会对这些novel类型的数据进行详细说明。
+
+
+position
+    
+position用于指定以左上角为原点的坐标系中的位置。(对position来说，可用区域由可视组件所在的图层给定，如果没有图层就是整个界面。对anchor来说，可用区域是其自身可视组件的大小。)
+
+
+position值的表示结果与数据类型有关：
+
+
+int (比如 0、1、37或42)
+    
+整数的表示结果为像素数，从可用区域最左边或顶边算起。
+
+
+float (比如 0.0、0.5或1.0)
+    
+浮点数的表示结果为可用区域的一个比例。例如，0.5表示区域内某条边的中点，1.0表示右侧边或者底边。
+
+
+absolute(value, /)
+
+    
+例如，当 `a` 和 `b` 类型相同，均为float或int型时，可以使用 `absolute(100.25)` 或 `absolute(a+b)` 。
+
+
+当启用精确子像素(subpixel-precise)渲染时，`absolute` 类型的值表示以界面左上角开始计的像素数，
+
+
+position(absolute, relative, /)
+
+    
+例如，`position(-10, .5)`。
+
+
+absolute 表示绝对坐标，relative 表示相对比例。两者(都换算成absolute类型后)相加的结果决定最后坐标。
+
+
+使用该函数时必须传两个参数，否则会产生不确定的结果。
+
+
+displayable
+    
+任意可视组件。若某个可视组件名包含某个类似“[prefix_]”的子串，就会按照如下描述进行前缀搜索。
+
+
+color
+    
+Ren’Py中的color可以写作以符号(#)开头、后面接十六进制的字符串。十六进制字符串长度可以为3或4的整数倍，分别对应几种颜色。
+
+
+十六进制字符串为3的整数倍时，分别对应红、绿、蓝三种颜色。十六进制字符串为4的整数倍时，分别对应红、绿、蓝和alpha通道值。举例：
+
+
+`"#f00"` 和 `"#ff0000"` 表现为不透明的纯红。
+
+
+`"#0f08"` 和 `#00ff0080"` 表现为某种半透明的绿色。
+
+
+颜色代码规律和用于HTML的颜色代码相同。
+
+
+color也可以用一个4元素的元组，每个元素都是介于0到255的整数，顺序对应红、绿、蓝和alpha通道值。
+
+
+`(0, 0, 255, 255)` 表现为完全不透明的蓝色。
+
+
+最后，color可以是 `Color` 类的一个实例。
+
+
+### 样式前缀搜索
+
+
+当某个样式特性包含“[prefix_]”可替换前缀，就会进行前缀搜索。前缀搜索会查找没一种状态前缀，根据原特性已经明确声明过的信息。
+
+
+举例，如果我们有如下脚本：
+
+
+```
+style button:
+    hover_background "[prefix_]background.png"
+
+```
+
+
+样式前缀搜索会分别搜索hover和selected_hover状态。前缀的搜索基于样式特性定义语句中的state值。
+
+
+state
+
+
+search order
+
+
+idle
+
+
+“idle_”, “”
+
+
+hover
+
+
+“hover_”, “”,
+
+
+insensitive
+
+
+“insensitive_”, “”, “idle_”
+
+
+selected_idle
+
+
+“selected_idle_”, “idle_”, “selected_”, “”
+
+
+selected_hover
+
+
+“selected_hover_”, “hover_”, “selected_”, “”
+
+
+selected_insensitive
+
+
+“selected_insensitive_”, “hover_”, “selected_”, “”, “selected_idle_”, “idle_”
+
+
+样式前缀搜索按上面表格给出的顺序进行。然后Ren’Py会坚持是否有符合那个名称的可加载文件或者图像存在。如果文件或图像存在，样式前缀搜索就会结束，并且使用找到的可视组件。否则，搜索会继续尝试下一个前缀。
+
+
+样式前缀会传给可视组件，不需要用户输入。
+
+
+这里是一个样例，演示这个功能如何使用。假设文件“idel_button.png”和“hover_button.png”存在(并且不存在其他以“button.png”字符串结尾的其他文件)：
+
+
+```
+style button:
+    background "[prefix_]button.png"
+
+```
+
+
+等效于：
+
+
+```
+style button:
+    idle_background "idle_button.png"
+    hover_background "hover_button.png"
+    insensitive_background "idle_button.png"
+
+    selected_idle_background "idle_button.png"
+    selected_hover_background "hover_button.png"
+    selected_insensitive_background "idle_button.png"
+
+```
+
+
+## 所有样式特性的列表
+
+
+样式特性控制各种可视组件的外观。但并不是所有特性都能应用于所有可视组件，所以我们将特性分了几个组。
+
+
+### 位置样式特性
+
+
+这类特性可以应用于所有可视组件，大部分通过布局(layout)控制可视组件在区域内的位置，或者不使用布局(layout)时直接控制在整个界面的位置。
+
+
+alt -  string or None
+
+    
+当self-voicing启用时，备选文本会用于可视组件。详见 自动语音 章节内容。
+
+
+xpos -  position
+
+    
+可视组件相对于可选区域左端的位置。
+
+
+ypos -  position
+
+    
+可视组件相对于可选区域顶端的位置。
+
+
+pos -  tuple of (position, position)
+
+    
+将xpos和ypos放入一个元组，分别作为元组的第一个和第二个元素。
+
+
+xanchor -  position
+
+    
+锚点相对于可选区域左端的位置。
+
+
+yanchor -  position
+
+    
+锚点相对于可选区域顶端的位置。
+
+
+anchor -  tuple of (position, position)
+
+    
+将xanchor和yanchor放入一个元组，分别作为元组的第一个和第二个元素。
+
+
+xalign -  float
+
+    
+将xpos和xanchor设置为相同值。根据该值将可视组件显示在界面的某个相对位置上，0.0表示左对齐，0.5表示居中，1.0表示右对齐。
+
+
+yalign -  float
+
+    
+将ypos和yanchor设置为相同值。根据该值将可视组件显示在界面的某个相对位置上，0.0表示顶端对齐，0.5表示居中，1.0表示底端对齐。
+
+
+align -  tuple of (float, float)
+
+    
+将xalign和yalign放入一个元组，分别作为元组的第一个和第二个元素。
+
+
+xcenter -  position
+
+    
+将xpos设为该特性的值，将xanchor设为0.5。
+
+
+ycenter -  position
+
+    
+将ypos设为该特性的值，将yanchor设为0.5。
+
+
+xycenter -  tupe of (position, position)
+
+    
+将元祖的第一和第二元素分别设为xcenter和ycenter的值。
+
+
+xoffset -  int
+
+    
+给出了水平方向的偏移值，单位为像素。
+
+
+yoffset -  int
+
+    
+给出了垂直方向的偏移值，单位为像素。
+
+
+offset -  tuple of (int, int)
+
+    
+将元祖的第一和第二元素分别设为xoffset和yoffset的值。
+
+
+xmaximum -  int
+
+    
+指定可视组件水平方向尺寸最大值，单位为像素。
+
+
+ymaximum -  int
+
+    
+指定可视组件垂直方向尺寸最大值，单位为像素。
+
+
+maximum -  tuple of (int, int)
+
+    
+使用元组指定可视组件尺寸最大值，水平和垂直方向分别使用元组的第一个和第二个元素。
+
+
+xminimum -  int
+
+    
+设置可视组件的最小宽度，单位为像素。仅对可以改变尺寸的可视组件有效。
+
+
+yminimum -  int
+
+    
+设置可视组件的最小高度，单位为像素。仅对可以改变尺寸的可视组件有效。
+
+
+minimum -  tuple of (int, int)
+
+    
+使用元组设置xminimum和yminimum。
+
+
+xsize -  int or float
+
+    
+将xminimum和xmaximum设置为相同值。该特性对可视组件的宽度生效。如果值是一个浮点数，表示区域宽度的一个比例值。
+
+
+ysize -  int or float
+
+    
+将yminimum和ymaximum设置为相同值。该特性对可视组件的高度生效。如果值是一个浮点数，表示区域高度的一个比例值。
+
+
+xysize -  tuple of (int or float, int or float)
+
+    
+使用元组第一个元素设置xminimum和xmaximum，使用元组的第二个元素设置yminimum和ymaximum。该特性对可视组件的尺寸生效。
+
+
+xfill -  boolean
+
+    
+若为True，可视组件会在水平方向填满所有可用空间。若不为True，可视组件只占用包含所有子组件的空间。
+
+
+仅对可以改变尺寸的可视组件有效。
+
+
+yfill -  boolean
+
+    
+若为True，可视组件会在垂直方向填满所有可用空间。若不为True，可视组件只占用包含所有子组件的空间。
+
+
+仅对可以改变尺寸的可视组件有效。
+
+
+area -  tuple of (int, int, int, int)
+
+    
+元组内元素可解释为 (xpos, ypos, width, height)。如果把某个可视组件的左上角放在 xpos 和 ypos 对应的位置，那么它的尺寸就是 width 和 height。
+
+
+这个特性会把xpos、ypos、xanchor、yanchor、xmaximum、ymaximum、xminimum、yminimum、xfill和yfill自动设置为合适的值。
+
+
+但这个特性并不适用于所有的可视组件和布局(layout)。
+
+
+mipmap -  boolean 或 None
+
+    
+该特性控制可视组件创建的纹理是否使用mipmap。该特性只适用于某些可视组件，包括 `Text()`，`Movie()` 和 dissolve。
+
+
+若非None，默认值从配置项 `config.mipmap_text`，`config.mipmap_movies` 和
+`config.mipmap_dissolves` 获取。
+
+
+### 文本样式特性
+
+
+antialias -  boolean
+
+    
+若为True，默认情况，全真字体(truetype font)文本会使用抗锯齿渲染。
+
+
+adjust_spacing -  boolean or str
+
+    
+若为True，Ren’Py会调整绘制分辨率下文本间隙以匹配虚拟分辨率下渲染的文本间隙，确保frame和其他容器类内的文本不会被改变。
+
+
+若设置为False，文本不会改变字号，但确保在任何窗口大小下布局文本都有足够空间，这是创作者的职责。
+
+
+当字符串设置为“horizontal”时，仅在水平方向调整文本。
+当字符串设置为“vertical”时，仅在垂直方向调整文本。
+
+
+对大多数文本来说都是用默认值True，但在需要 `input` 输入的情况下使用False。
+
+
+altruby_style -  style or None
+
+    
+如果为值非None，这应是一个样式对象。它会用作转换的ruby文本样式。
+
+
+axis -  dict or None
+
+    
+该特性可以设置 可变字体 的圆形区域轴线(axis)。
+若非None，其应是一个字典，可以根据轴线名查找对应的值。例如：
+
+
+```
+style default:
+    font "VariableFont.ttf"
+    axis { "weight" : 500, "width" : 95 }
+
+```
+
+
+black_color -  color
+
+    
+当渲染某个基于图像的字体时，黑色会被映射为需要的颜色。这个特性对truetype字体无效。
+
+
+在处理ruby/片假名文本时，该特性可以是None，表示使用主文本同样的颜色。
+
+
+bold -  boolean
+
+    
+若为True，使用粗体渲染。对全真(truetype)字体来说，这个特性会会综合提升字体的重量(weight)。这个特性也可能会触发字体映射，使用
+`config.font_replacement_map` 配置的值。
+
+
+caret -  displayable or None
+
+    
+若非None，其应是一个可视组件。输入部件会使用这个可视组件显示在文本的末尾。若为空，会有一条1像素宽的线在行尾闪烁。
+
+
+color -  color
+
+    
+文本渲染使用的色彩。当使用某个全真(truetype)字体时，字体会直接使用色彩渲染。当使用基于图像的字体时，白色会映射为指定的色彩。
+
+
+在处理ruby/片假名文本时，该特性可以是None，表示使用主文本同样的颜色。
+
+
+emoji_font -  string
+
+    
+该字体用作Emoji表情。遇到一个或多个Emoji表情时会自动替换，但不能使用文本标签(text tag)。
+
+
+first_indent -  int
+
+    
+首行缩进量，单位是像素。
+
+
+font -  string
+
+    
+用于渲染文本的字体名称字符串。
+
+
+对于全真(truetype)字体文件来说，该字符串通常就是包含字体的文件名(例如 `"DejaVuSans.ttf"`)。如果需要使用字体集的第二种字体，就在字体名前面加一个数字和@符号，(例如 `“0@font.ttc”` 或 `“1@font.ttc”`)。对于基于图像的字体来说，该字符串是字体注册时使用的名称。
+
+
+font_features -  dict or None
+
+    
+若非None，该项是一个字典，对应OpenType布局功能特性的值。
+字典的键是OpenType功能特性的4字符标签，值则是布尔型。
+
+
+样例：
+
+
+```
+style default:
+    font "SomeFont.ttf"
+    font_features { "liga" : True, "smcp" : True, "calt" : False }
+
+```
+
+
+OpenType布局功能特性的列表可以参考 这里 。
+
+
+hinting -  str
+
+    
+控制字体如何进行微调。可以是以下几个字符串之一：
+
+
+“auto”
+    
+默认值，使用Freetype自动微调。
+
+
+“auto-light”
+    
+在light模式下，强制使用Freetype自动在竖直方向上微调。
+
+
+“bytecode”
+    
+使用字体中的bytecode微调信息。
+
+
+“none”
+    
+对字体不进行微调。
+
+
+若该项为True，则会查找和应用 `config.font_hinting` 的配置。
+
+
+hyperlink_functions -  tuple of (function, function, function)
+
+    
+这是由三个与超链接有关的函数构成的元组。
+
+
+第一个元素是超链接样式函数。当使用一个入参(超链接)调用函数时，会返回得到用于该超链接的样式对象，比如 `style.hyperlink_text` 。需要注意，样式对象并不是一个字符串。
+
+
+第二个元素是超链接点击函数。当超链接被用户选中的时候，该函数会被调用。如果该函数返回一个值并且不是None，这个值也会作为互动行为的返回值。
+
+
+第三个元素是超链接焦点函数。当超链接获取焦点时，该函数会被调用，并将超链接作为入参；当超链接失去焦点时，该函数也会被调用，入参使用空值(None)。如果该函数返回一个值并且非空，这个值也会作为互动行为的返回值。
+
+
+instance -  string or None
+
+    
+该项是一个字符串，指定 可变字体 的字体实例。
+例如某个字体具有“Bold”(粗体)实例，就可以将该项设置为“Bold”，显示的字体就是粗体。
+
+
+italic -  boolean
+
+    
+若为True，使用斜体渲染文本。对全真(truetype)字体来说，这个特性会会综合提升字体的倾斜度(slant)。这个特性也可能会触发字体映射，使用
+`config.font_replacement_map` 配置的值。
+
+
+justify -  boolean
+
+    
+若该值为True，单词之间会插入额外的空白，每行文字左右两端的空白也会增加。段落最后一行的结尾不会发生变化。
+
+
+kerning -  float
+
+    
+字偶距调整，任意两个字符之间的空白像素数会增加。(如果要缩小字符之间的空白，该值应该是负数。)
+
+
+language -  string
+
+    
+控制语言文字族断行。合法值如下：
+
+
+`"unicode"` (default)
+    
+使用unicode断行算法，大多数语言的默认项。
+
+
+`"japanese-strict"`
+    
+使用“strict”法格式化日语文本。禁止在小写的假名和延音记号前断行。
+
+
+`"japanese-normal"`
+    
+使用“normal”法格式化日语文本。允许在小写的假名、延音标记和某些连字符号后断行。
+
+
+`"japanese-loose"`
+    
+使用“loose”法格式化日语文本。允许在小写的假名、延音标记、叠字符号、不可分割字符、中心化标点符号和后缀的后面断行；也允许在前缀的前面断行。
+
+
+`"korean-with-spaces"`
+    
+使用空白定界的韩语文本。防止临近的韩语字符之间出现断行。
+
+
+`"thaic90"`
+    
+用于泰语文本，使用支持C90编码的字体。将字符序列映射为PUA字形代码点，以实现正确的字形位置。
+断行使用Unicode算法。大多数情况下，泰语文本应该使用 `"unicode"` (默认值)。
+只有在使用Ren’Py 8.4之前的版本，或者使用 `"freetype"` 作为字体渲染器时才需要使用。
+
+
+`"western"`
+    
+只循序在空白处断行。适用于大多数语言。
+
+
+`"anywhere"`
+    
+没有ruby的任意地方都可以断行。
+
+
+三种日语的断行模式来源于 CSS3文本模块。
+
+
+layout -  string
+
+    
+控制每行单词(字)的分配方式。合法值如下：
+
+
+`"tex"` (default)
+    
+使用Knuth-Plass断行算法。该算法能让除最后一行之外，各行的长度差异尽可能小。
+
+
+`"subtitle"`
+    
+使用Knuth-Plass断行算法，但会使用空格尽可能让每行长度一致。
+
+
+`"greedy"`
+    
+每行尽可能多得放入单词(字)。
+
+
+`"nobreak"`
+    
+不断行。
+
+
+line_leading -  int
+
+    
+每行所占空间的像素数。
+
+
+line_overlap_split -  int
+
+    
+在慢速文本模式下两行文本有重叠部分，这部分重叠像素分配给上面那行文本。如果上面那行文本的底部出现了被裁减的情况，就增加该特性的值。
+
+
+line_spacing -  int
+
+    
+每一行下面空间的像素数。
+
+
+min_width -  int
+
+    
+设置每行的最小宽度。如果某行的宽度小于该值，会使用两侧留白填充至该值。`text_align` 用于指定填充方式。
+
+
+newline_indent -  boolean
+
+    
+若为True，  `first_indent` 的缩进量会应用于每个新行。否则使用 `rest_indent`
+的缩进量。
+
+
+outlines -  list of tuple of (int, color, int, int)
+
+    
+这是一个文本后绘制的轮廓线列表。每个元组指定一种轮廓线，轮廓线从后往前绘制。
+
+
+列表中包含 (size, color, xoffset, yoffset)
+形式的元组。 Size 是字体外沿尺寸，单位为像素。 Color 是轮廓线色彩。 xoffset 和
+yoffset 是轮廓线的位移，单位为像素。
+
+
+轮廓线功能可以用于给字体添加投影，方法是将size设为0，偏移量设为非0。
+
+
+默认情况下， size, xoffset 和 yoffset 会随文本一同拉伸。当我们给定absolute类型时，就能禁止拉伸。举例：
+
+
+```
+style default:
+    outlines [ (absolute(1), "#000", absolute(0), absolute(0)) ]
+
+```
+
+
+这段脚本产生了1像素宽的边界。
+
+
+轮廓线只对全真(truetype)字体有效。
+轮廓线只能对整个文本组件应用时才生效。
+无法应该用在超链接、文本标签和文本的部分内容。
+
+
+outline_scaling -  string
+
+    
+游戏窗口缩放后，该特性决定文字轮廓线的大小和偏移如何缩放。
+
+
+`"linear"`
+    
+默认值，粗轮廓线的最佳方案。窗口缩放系数直接乘以轮廓线大小的值，然后取整。
+轮廓线越粗越好，否则同心的相近粗细轮廓线可能会混在一起看不清。
+
+
+缩放后的轮廓线粗细值至少为1像素。
+
+
+`"step"`
+    
+细轮廓线或多重轮廓线的最佳方案。
+窗口缩放系数向下取整，然后乘以轮廓线粗细和偏移值。
+这样可以确保多重轮廓线可以同时缩放，不会发生互相遮挡。
+但在不同游戏窗口尺寸条件下，视觉效果会略有不同。
+
+
+窗口缩放系数不小于1。
+
+
+prefer_emoji -  boolean
+
+    
+某些Unicode字符可以同时解释为Emoji表情或其他文本。该样式特性决定这种字符的优先显示为Emoji表情。
+
+
+reading_order -  string
+
+    
+该特性控制启用RTL(right-to-left)支持后的文本显示方式，主要用于控制无法判断左右阅读顺序的部分，
+比如完全由标点组成的一行。
+
+
+`None`
+    
+默认值，阅读顺序完全取决于文本。大多数无法判断阅读顺序的行都会视为从左往右。
+
+
+`"ltr"`
+    
+强制从左往右，即使一行中主要内容都是从右往左阅读的文字。
+
+
+`"rtl"`
+    
+强制从右往左，即使一行中主要内容都是从左往右阅读的文字。
+
+
+`"wltr"`
+    
+偏向于从左往右，但根据实际内容可能会切换为从右往左显示。可以用在完全由标点组成的部分，例如 `"..!"`。
+
+
+`"wrtl"`
+    
+偏向于从右往左，但根据实际内容可能会切换为从左往右显示。可以用在完全由标点组成的部分，例如 `"..!"`。
+
+
+rest_indent -  int
+
+    
+指定段落首行之外的缩进量，单位为像素。
+
+
+ruby_line_leading -  int
+
+    
+含有 ruby文本 的文本行间距，单位是像素。该项会加在 `line_leading` 上并产生最终效果。
+
+
+ruby_style -  style or None
+
+    
+如果非None，该值是一个样式对象，用于ruby文本。
+
+
+shaper -  "harfbuzz" or "freetype".
+
+    
+文本渲染使用的字体引擎(shaper)。该项只能是“harfbuzz”和“freetype”两者其中之一。
+harfbuzz用途更广，但只能在Ren’Py 8上运行。而freetype还能在Ren’Py 7上运行。
+
+
+字体引擎(shaper)会将一系列字符转为一串固定位置的字形(glyphs)。其用在连写字符、印地/婆罗米文以及Emoji表情。
+
+
+size -  int
+
+    
+界面中字体的字号。通常字号大小就是字体高度的像素值，字体文件中可能还会插入几个像素。
+
+
+slow_abortable -  boolean
+
+    
+如果为True，能传到文本对象的点击事件会触发退出慢速文本模式，这意味着后面部分的文本会立刻显示。
+
+
+slow_cps -  int or True
+
+    
+如果是一个整数，表示每秒显示的字符速率。如果为True，使用个性化配置中的“文本速度”。
+
+
+slow_cps_multiplier -  float
+
+    
+文本显示速度会乘上该值。可以用于表现某个角色的说话速度比正常速率略快的情况。
+
+
+strikethrough -  boolean
+
+    
+若为True，每行文字会添加删除线。
+
+
+textalign -  float
+
+    
+当一行文本的宽度比文本组件的宽度小时，该项起作用。其决定文本左边会有多少留白。(也就是文本的对齐。)
+
+
+0.0表示左对齐，0.5表示中央对齐，1.0表示右对齐。
+
+
+underline -  boolean
+
+    
+若为True，文本会添加下划线。
+
+
+vertical -  boolean
+
+    
+若为True，文本内容会渲染为垂直文本。
+
+
+There are multiple caveats:
+
+
+若 `shaper` 的值是“freetype”。垂直文本会有问题。
+
+
+harfbuzz渲染器遇到字体中存在的格式(form)时，会从水平格式转成垂直格式。
+
+
+字符会从按“从上到下，从右往左”的顺序排列，而不会旋转。即，各个字符会呈现叠罗汉似的排列方式。
+
+
+如果字体中没有垂直文本的相关信息，字体渲染器则会尝试合成，但不保证结果正确。
+总体来说，表意文字的合成效果比非表意文字要好。
+
+
+### 窗口样式特性
+
+
+窗口特性用于指定窗口、框架和按钮的外观。
+
+
+background -  displayable or None
+
+    
+用作窗口背景的可视组件。通常是一个 `Frame()`，能根据窗口大小拉伸背景的尺寸。
+
+
+若为None，不绘制背景。但其他特性函数会假设背景存在。
+
+
+foreground -  displayable or None
+
+    
+若不为None，该可视组件会在窗口内容上绘制并覆盖。
+
+
+left_margin -  int
+
+    
+背景左端的透明空间量，单位为像素。
+
+
+right_margin -  int
+
+    
+背景右端的透明空间量，单位为像素。
+
+
+xmargin -  int
+
+    
+等效于将left_margin和right_margin设置为相同的值。
+
+
+top_margin -  int
+
+    
+背景顶端的透明空间量，单位为像素。
+
+
+bottom_margin -  int
+
+    
+背景底端的透明空间量，单位为像素。
+
+
+ymargin -  int
+
+    
+等效于将top_margin和bottom_margin设置为相同的值。
+
+
+margin -  tuple
+
+    
+如果出现的是2个元素的元组，分别将xmargin和ymargin设置为对应的两个元素值。如果出现的是4元素元组，分别将left_margin、top_margin、right_margin和bottom_margin设置为对应的4个元素值。
+
+
+left_padding -  int
+
+    
+背景与窗口内容左边的空间量，单位为像素。
+
+
+right_padding -  int
+
+    
+背景与窗口内容右边的空间量，单位为像素。
+
+
+xpadding -  int
+
+    
+等效于将left_padding和right_padding设置为相同的值。
+
+
+top_padding -  int
+
+    
+背景与窗口内容顶边的空间量，单位为像素。
+
+
+bottom_padding -  int
+
+    
+背景与窗口内容底边的空间量，单位为像素。
+
+
+ypadding -  int
+
+    
+等效于将top_padding和bottom_padding设置为相同的值。
+
+
+padding -  tuple
+
+    
+如果出现的是2个元素的元组，分别将xpadding和ypadding设置为对应的两个元素值。如果出现的是4元素元组，分别将left_padding、top_padding、right_padding和bottom_padding设置为对应的4个元素值
+
+
+size_group -  string or None
+
+    
+若非None，该值是一个字符串。Ren’Py会使用size_group值相同的尺寸渲染所有窗口。
+
+
+modal -  boolean or callable
+
+    
+若为True，窗口设为模态。鼠标点击事件值对当前窗口内的window或按钮组件有效，不会广播穿透。
+若为False，窗口设为非模态。
+
+
+该项也可以是一个可调用的函数。
+其为函数时，入参使用(ev, x, y, w, h)形式的四元元组。其中ev是pygame事件消息，也可能是None笼统表示一个鼠标事件；x和y表示窗口坐标，w和h表示窗口的宽和高。函数返回为True时，窗口视为模态，否则视为非模态。
+
+
+### 按钮样式特性
+
+
+child -  displayable or None
+
+    
+若非None，给出的可视组件会替换按钮的子组件。例如，该可视组件(作为insensitive_child)可以用于替换insensitive的按钮图片内容，insensitive表示按钮被锁住无法使用。
+
+
+hover_sound -  string
+
+    
+当按钮获取焦点时，将播放一个音效。
+
+
+activate_sound -  string
+
+    
+当按钮被点击时，将播放一个音效。
+
+
+hover_sound -  - string
+
+    
+当按钮获得焦点时，将播放一个音效。
+
+
+activate_sound - 
+
+    
+当按钮被激活(点击)时，将播放一个音效。
+也会在条(bar)和拖拽组件激活时播放该音效。
+
+
+mouse -  string
+
+    
+鼠标样式用于按钮获得焦点状态。这是定义在 `config.mouse` 中的样式之一。
+
+
+focus_mask -  multiple
+
+    
+一个mask遮罩，用于控制按钮哪些区域可以获得焦点，哪些区域不响应点击。该特性的类型决定了其如何被解释。
+
+
+Displayable
+    
+可视组件的不透明区域，可以让按钮获得焦点。
+
+
+True
+    
+按钮自身用作可视组件(按钮的非透明区域可以让按钮获得焦点)。
+
+
+callable
+    
+如果一个不可视组件被调用(像函数、方法或者带有__call__方法的对象)，该该函数被使用两个入参调用，从对应可视组件左上角算起，x和y轴的两个偏移量。
+
+
+如果使用两个入参调用该函数，则函数返回一个可调用对象。
+返回对象可以使用4个参数调用，x和y的偏移值，以及可视组件的宽度和高度。
+
+
+若函数返回结果为True，可视组件获得焦点。
+
+
+None
+    
+如果该值为None，整个按钮都可以获得焦点。
+
+
+keyboard_focus -  boolean
+
+    
+若为True，也是默认值，按钮可以通过键盘的焦点机制获得焦点，前提是这个按钮本身允许获得焦点。若为False，键盘焦点机制会跳过这个按钮。(键盘焦点机制使用键盘或者类似键盘的设备，比如游戏手柄。)
+
+
+keyboard_focus_insets -  (int, int, int, int) or None
+
+    
+若不是None，该项应该是一个包含4个整数的元组，表示一个矩形区域4个角能收缩的像素数。
+当使用键盘让组件获取焦点时，将会用到该特性。
+
+
+在有按钮相互覆盖的情况下，该特性会有用。处理键盘来控制焦点的算法，无法处理按钮相互覆盖的情况。
+如果使用该特性提前在内部处理，就能解决类似问题。
+
+
+key_events -  boolean
+
+    
+若为True，键盘生成的事件消息会传给键盘的子组件。若为False，这些事件就不会向下广播。默认样式中，按钮上有鼠标悬停时该值为True，其他情况下该值为False。
+
+
+将这个值设置为True可以用于广播键盘事件消息至某个按钮内的输入框，而那个按键并不需要获得焦点。
+
+
+### 条(bar)样式特性
+
+
+条(bar)是一个左右两边带有沟槽的组件，点击后触发滑块在条内平移一小段距离。滑块与左右两端的间隔就是还允许移动的距离。
+
+
+滑块是条(bar)中允许用户拖拽的部分。
+
+
+当绘制一个条(bar)后，滑块的阴影首先被绘制。然后是滑块本身，最后是条(bar)的左/底边和右/顶边。
+
+
+需要注意条(bar)的边取决于bar_vertical特性的值。若bar_vertical为True，顶边和底边会实际绘制。否则，只有左边和右边。
+
+
+bar_vertical -  boolean
+
+    
+若为True，纵向条(bar)。若为False，横向条(bar)。
+
+
+bar_invert -  boolean
+
+    
+若为True，条(bar)上滑块对应的值显示在右/上侧；否则，显示在左/下侧。
+
+
+bar_resizing -  boolean
+
+    
+若为True，重新调整条(bar)的尺寸。若为False，使用全尺寸渲染各条边，然后裁剪。
+
+
+left_gutter -  int
+
+    
+左边沟槽尺寸，单位为像素。
+
+
+right_gutter -  int
+
+    
+右边沟槽尺寸，单位为像素。
+
+
+top_gutter -  int
+
+    
+顶边沟槽尺寸，单位为像素。
+
+
+bottom_gutter -  int
+
+    
+底边沟槽尺寸，单位为像素。
+
+
+left_bar -  displayable
+
+    
+用于左边的可视组件。
+
+
+right_bar -  displayable
+
+    
+用于右边的可视组件。
+
+
+top_bar -  displayable
+
+    
+用于顶边的可视组件。
+
+
+bottom_bar -  displayable
+
+    
+用于底边的可视组件。
+
+
+base_bar -  displayable
+
+    
+单个可视组件用于left_bar/right_bar或者top_bar/bottom_bar，自动适配。(带滑块的情况下，还可以用作滑动条或者滑动栏。)
+
+
+thumb -  displayable or None
+
+    
+若非None，这是一个绘制在条(bar)的各条边空间内的可视组件。
+
+
+thumb_align -  float
+
+    
+滑块与条(bar)的对齐方式。
+如果条(bar)和滑块的尺寸不同——例如，滑块比水平条(bar)还要高——可以把thumb_align设置为0.5，使滑块与条(bar)居中对齐。
+
+
+thumb_shadow -  displayable or None
+
+    
+若非None，这是一个绘制在条(bar)的各条边空间内的可视组件。
+
+
+thumb_offset -  int or tuple of (int, int)
+
+    
+滑块与条(bar)重叠部分的大小，单位为像素。如果想让条(bar)的左右两边看起来不像被截断的样子，就把该值设为滑块(thumb)宽度的一半。
+该值也可以是一个(int, int)元组。第一个元素用于滑块向左/向上的偏移量，第二个元素用于滑块向右/向下的偏移量。
+
+
+mouse -  string
+
+    
+鼠标样式，用于按钮获得焦点时。该字符串应是 `config.mouse` 定义的样式之一。
+
+
+unscrollable -  string or None
+
+    
+当无法滚动时，控制条(bar)的行为表现(如果滚动范围设置为0，视点范围内的可视组件小于其自身)。总共有3种可能的值：
+
+
+`None`
+    
+正常渲染条(bar)。
+
+
+`"insensitive"`
+    
+渲染insensitive状态下条(bar)。这个值允许条(bar)改变自身样式，尽管那很少使用。
+
+
+`"hide"`
+    
+不渲染条(bar)。但是空间会预留给条(bar)，但该空间内不会绘制任何东西。
+
+
+keyboard_focus -  boolean
+
+    
+若为True，也是默认值，按钮可以通过键盘的焦点机制获得焦点，前提是这个按钮本身允许获得焦点。若为False，键盘焦点机制会跳过这个按钮。(键盘焦点机制使用键盘或者类似键盘的设备，比如游戏手柄。)
+
+
+### 方框(box)样式特性
+
+
+这些样式特性用于横向和纵向的方块布局。
+
+
+spacing -  int
+
+    
+方块内成员之间的空间距离，单位为像素。
+
+
+first_spacing -  int
+
+    
+若非None，表示，方框内的第一个跟第二个成员间的空间距离，单位为像素。该值覆盖spacing特性。
+
+
+box_reverse -  boolean
+
+    
+若为True，方块内物品位置将被翻转。hbox左右镜像翻转，vbox上下镜像翻转。默认情况下的值为False。
+
+
+box_wrap -  boolean
+
+    
+若为True，当到达方块最后一行或列时会发生扭转(warp)。若为False，会在每一行的结尾扩展。
+
+
+box_wrap_spacing -  int
+
+    
+当box_wrap为True时，box_wrap_spacing项用于指定被wrap的行或列的间距。
+(行间距就是被warp的hbox在垂直方向空间，列间距就是被warp的vbox在水平方向的空间。)
+
+
+box_align -  float or None
+
+    
+该特性决定了box组件内行或列的对齐方式。
+若为默认值0.0，列使用左对齐，行使用上对齐。
+若为0.5，则居中对齐。
+
+
+若该特性值为None，且设置了 `xfill` 或 `yfill` 的值，则不会给子组件添加额外的空白，
+并忽略box主方向内子组件的坐标值。
+
+
+order_reverse -  boolean
+
+    
+若为False，也就是默认值，方框内元素会从前往后绘制，第一个元素下面是第二个元素。若为True，顺序会倒过来，第一个元素会在方框最底层。
+
+
+box_justify -  boolean or "first" or "all"
+
+    
+若不为False，box中的内容两端对齐——即一行中的各元素间会被添加合适的空间，使首尾正好充满一行。
+若为True，则除了最后一行都将两端对齐。
+若为“first”，则只有首行两端对齐。
+若为“all”，则每一行都两端对齐，包括最后一行。
+设置两端对齐后，其他对齐效果不再生效，除非某行只有一个元素。
+
+
+若该特性值不为False，且设置了 `xfill` 或 `yfill` 的值，则不会给子组件添加额外的空白，
+并忽略box主方向内子组件的坐标值。
+
+
+### 网格(grid)样式特性
+
+
+这些特性用于网格(grid)和虚拟样机网格(vpgrid)可视组件中。
+
+
+spacing -  int
+
+    
+各网格单元之间的空间，单位为像素。
+
+
+xspacing -  int or None
+
+    
+各网格单元之间水平方向的空间，单位为像素。当这个值不是None时，优先级比spacing特性高。
+
+
+yspacing -  int or None
+
+    
+各网格单元之间垂直方向的空间，单位为像素。当这个值不是None时，优先级比spacing特性高。
+
+
+### 固定布局的样式特性
+
+
+这些特性用于固定布局(layout)。
+
+
+fit_first -  boolean or "width" or "height"
+
+    
+若为True，固定宽度的布局所有单元尺寸都会严格等于第一个单元内元素的尺寸。如果是“width”，只有单元格宽度能改变(固定布局会在垂直方向上填满界面)。类似的，“height”值能改变单元跟高度。
+
+
+由于 fit_first 的原因，子组件的位置将被忽略。
+
+
+xfit -  boolean
+
+    
+若为True，固定布局的尺寸在水平方向会严格匹配最右侧子组件的尺寸。
+
+
+yfit -  boolean
+
+    
+若为True，固定布局的尺寸在垂直方向会严格匹配最底部子组件的尺寸。
+
+
+提供了以上特性时，固定布局的子组件们会首先根据指定整块区域。一旦获得子组件的尺寸和位置，再根据固定布局的尺寸应该对应的特性。
+
+
+### 边距样式特性
+
+
+边距(margin)样式特性用于增加某些可视组件周围的透明空间。可用于：window、frame、button、grid和vpgrid。
+
+
+left_margin -  int
+
+    
+可视组件左边距，单位为像素。
+
+
+right_margin -  int
+
+    
+可视组件右边距，单位为像素。
+
+
+xmargin -  int
+
+    
+等效于，将左边距和右边距设置为相同的值。
+
+
+top_margin -  int
+
+    
+可视组件上边距，单位为像素。
+
+
+bottom_margin -  int
+
+    
+可视组件下边距，单位为像素。
+
+
+ymargin -  int
+
+    
+等效于，将上边距和下边距设置为相同的值。
+
+
+margin -  tuple
+
+    
+该值可以是一个2元元组，分别设置xmargin和ymargin。
+该值也可以是一个4元元组，分别设置left_margin、top_margin、right_margin和bottom_margin。
