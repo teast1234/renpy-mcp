@@ -31,8 +31,10 @@ Ren'Py has no built-in editor — developers manually write `.rpy` text files an
 | Write code | Inject code into any .rpy file (8 positioning modes), auto-create files, preserve BOM |
 | Compile & verify | Compile + lint in one call, returns structured errors (file + line + message) |
 | Auto-fix | Detect and fix 5 common issues: `return True/False`, missing `from` clause, BOM inconsistency, missing labels, stale saves |
+| **Translation checks** | **List all languages / deep-check translation coverage (catches "string-only, missing block translation" silent bugs) / verify language picker config** |
 | Save management | List / clear / clear-stale saves (fixes `Could not find return label` errors) |
 | Asset management | Copy images / fonts / audio into project, get image dimensions for sprite positioning |
+| Generic CLI | Run any Ren'Py CLI subcommand directly (compile / lint / translate / etc.) with custom timeout |
 | Cross-platform | Windows / macOS / Linux fully supported, SDK path auto-detected |
 
 **Core workflow:**
@@ -54,11 +56,13 @@ search_docs → list_labels → exec_rpy → check_project → auto_fix
                        ▼
 ┌──────────────────────────────────────────────┐
 │              renpy-mcp Server                  │
-│           (FastMCP, 15 tools)                  │
+│           (FastMCP, 19 tools)                  │
 ├──────────┬──────────┬──────────┬──────────────┤
 │  Read    │  Write   │  Verify  │   Docs KB     │
 │ (4 tools)│ (1 tool) │ (5 tools)│  (2 tools)   │
 ├──────────┴──────────┴──────────┴──────────────┤
+│ Translation(3) GenericCLI(1) Saves(1) Assets(2)│
+├───────────────────────────────────────────────┤
 │              Core capabilities                  │
 │  ┌─────────┐  ┌──────────┐  ┌───────────────┐  │
 │  │ Regex   │  │ File I/O │  │ subprocess    │  │
@@ -81,9 +85,10 @@ renpy-mcp/
 │   ├── server.py              # MCP server entry + tool registration
 │   ├── project.py             # Label parsing: list_labels / read_script / find_references / list_definitions
 │   ├── executor.py            # Code injection: exec_rpy (8 positions + CJK font)
-│   ├── build.py               # Build tools: compile / lint / check_project / manage_saves
+│   ├── build.py               # Build tools: compile / lint / check_project / manage_saves / run_renpy_command
 │   ├── fixer.py               # Auto-fix: auto_fix (5 fixers)
 │   ├── assets.py              # Asset management: copy_asset / get_image_size
+│   ├── translation.py         # Translation: list_translations / check_translation / check_language_picker
 │   ├── docs_search.py         # Doc search: search_docs / list_doc_pages
 │   ├── config.py              # SDK path config (cross-platform auto-detection)
 │   └── docs/                  # Bundled official docs (23 pages, 580KB)
@@ -194,7 +199,7 @@ Restart Cursor / Claude Desktop. The MCP server starts automatically. Your AI ca
 
 ---
 
-## 📡 15 Tools Overview
+## 📡 19 Tools Overview
 
 ### Read Code (4)
 
@@ -256,6 +261,20 @@ Restart Cursor / Claude Desktop. The MCP server starts automatically. Your AI ca
 | `search_docs` | Search bundled Ren'Py Chinese official docs (23 pages), return relevant sections |
 | `list_doc_pages` | List all available doc pages |
 
+### Translation Checks (3)
+
+| Tool | Description |
+|------|-------------|
+| `list_translations` | List all languages under `game/tl/`; for each: file count, dialogue block-translation count, string-translation entry count, GUI file completeness, plus the source language (`config.language`) |
+| `check_translation` | Deep-check translation coverage. **Key detection**: a translation file with `translate <lang> strings:` (old/new) but NO `translate <lang> <hash>:` block translations — Ren'Py does NOT translate say-statement dialogue via string translation, so such a file leaves dialogue silently in the source language. Also detects: duplicate `old` strings (runtime error), untranslated blocks, source files with dialogue but no translation file |
+| `check_language_picker` | Verify `screens.rpy` language picker: catches an "English" button miswired to `Language(None)` (show source text) instead of `Language("english")` (apply translation), dead buttons pointing at non-existent `tl/` folders, and missing buttons for available translations |
+
+### Generic CLI (1)
+
+| Tool | Description |
+|------|-------------|
+| `run_renpy` | Run any Ren'Py CLI subcommand directly (compile / lint / translate / rtc / etc.) with a custom timeout. Useful for generating/refreshing translation files (`translate english`) or as a fallback when dedicated tools time out |
+
 ---
 
 ## 📝 Typical Workflows
@@ -292,6 +311,20 @@ find_references("chapter_03")   → No callers = dead code
 find_references("typo_label")   → defined=False = jump to non-existent label
 ```
 
+### Scenario 5: Translation debugging ("I selected English but text is still Chinese")
+
+```text
+list_translations()          → See what languages exist and how much is translated
+check_translation("english") → Catch "string-only, missing block translation" silent bugs
+                             + duplicate old strings + missing translation files
+check_language_picker()      → Verify the "English" button isn't miswired to Language(None)
+run_renpy("translate",["english"]) → Regenerate block-translation skeletons
+```
+
+> **Real case**: a chapter's translation file was written in string-translation format (old/new).
+> It compiled fine, but in-game the dialogue stayed in the source language — because Ren'Py
+> translates dialogue only via block translation. `check_translation` catches this instantly.
+
 ---
 
 ## 💡 Design Notes
@@ -302,6 +335,9 @@ find_references("typo_label")   → defined=False = jump to non-existent label
 - **SDK auto-detection**: Scans common paths if `RENPY_SDK_PATH` not set, picks newest match
 - **Modifiers preserve BOM**: When writing, detects and preserves original file's BOM
 - **Read-only checkers don't modify**: `missing_labels` and `stale_saves` report only
+- **Compile never hangs**: subprocess uses `stdin=DEVNULL`; timeout adjustable via `RENPY_MCP_TIMEOUT` env var (default 180s)
+- **Translation checks are read-only**: `check_translation` / `check_language_picker` only analyze and report, never modify your translation files
+- **Precise dialogue detection**: when counting source dialogue, only defined `Character` variable names are counted — screen/style property lines like `color "#fff"` or `key "K_SPACE"` are not mistaken for dialogue
 
 ---
 

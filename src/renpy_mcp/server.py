@@ -9,10 +9,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from mcp.server.fastmcp import FastMCP
 from renpy_mcp.project import list_labels, read_script, find_references, list_definitions
 from renpy_mcp.executor import exec_rpy
-from renpy_mcp.build import compile_project, lint_project, check_project, manage_saves
+from renpy_mcp.build import compile_project, lint_project, check_project, manage_saves, run_renpy_command
 from renpy_mcp.assets import copy_asset, get_image_size
 from renpy_mcp.fixer import auto_fix, list_fixers
 from renpy_mcp.docs_search import search_docs, list_doc_pages
+from renpy_mcp.translation import list_translations, check_translation, check_language_picker
 
 mcp = FastMCP("Ren'Py MCP")
 
@@ -304,6 +305,108 @@ def tool_list_doc_pages() -> dict:
         dict with {ok, pages: [{name, size}], total_pages, total_size}.
     """
     return list_doc_pages()
+
+
+@mcp.tool()
+def tool_list_translations(project_path: str) -> dict:
+    """List all translation languages in a Ren'Py project.
+
+    Scans game/tl/ for language folders and reports, for each language: file
+    count, dialogue block-translation count, string-translation entry count,
+    and which GUI files (common/screens/options) are present. Also reports the
+    project's source language (config.language).
+
+    Use this first to see what translations exist before checking them.
+
+    Args:
+        project_path: Absolute path to the Ren'Py project root directory.
+
+    Returns:
+        dict with {ok, source_language, tl_dir, languages: [{code, files,
+        dialogue_blocks, string_entries, has_common, has_screens, has_options}]}.
+    """
+    return list_translations(project_path)
+
+
+@mcp.tool()
+def tool_check_translation(project_path: str, language: str | None = None) -> dict:
+    """Deep-check translation coverage. Catches silent dialogue-not-translated bugs.
+
+    The most important check: a translation file that ONLY contains
+    ``translate <lang> strings:`` (old/new pairs) but NO ``translate <lang>
+    <hash>:`` block translations. Ren'Py does NOT translate say-statement
+    dialogue via string translation -- only block translation does that. A
+    string-only file leaves dialogue in the source language with no error.
+
+    Also detects: duplicate ``old`` strings (runtime error risk), untranslated
+    block translations (active line still equals the source comment), and
+    source files with dialogue that have no translation file at all.
+
+    Args:
+        project_path: Absolute path to the Ren'Py project root directory.
+        language: Language code to check (e.g. "english"). If None, checks all
+            languages found under game/tl/.
+
+    Returns:
+        dict with {ok, source_language, languages: [{code, issues, summary}]}.
+        Issues have severity "error" | "warning" | "info".
+    """
+    return check_translation(project_path, language)
+
+
+@mcp.tool()
+def tool_check_language_picker(project_path: str) -> dict:
+    """Verify the language picker in screens.rpy against tl/ folders and config.language.
+
+    Catches the common misconfiguration where the "English" button is wired to
+    ``Language(None)`` (show source text) instead of ``Language("english")``
+    (apply the english translation) -- when the source language is not
+    English, Language(None) shows the source (e.g. Chinese) text, so clicking
+    "English" appears to do nothing.
+
+    Also detects: dead buttons pointing at tl/ folders that don't exist, and
+    missing buttons for translations that do exist.
+
+    Args:
+        project_path: Absolute path to the Ren'Py project root directory.
+
+    Returns:
+        dict with {ok, source_language, available_languages, buttons, issues}.
+    """
+    return check_language_picker(project_path)
+
+
+@mcp.tool()
+def tool_run_renpy(
+    project_path: str,
+    command: str,
+    args: list[str] | None = None,
+    timeout: int | None = None,
+) -> dict:
+    """Run an arbitrary Ren'Py CLI subcommand via the SDK's bundled Python.
+
+    Generic escape hatch for Ren'Py CLI subcommands without a dedicated wrapper.
+    Useful for ``translate`` (generate/refresh translation files), ``rtc``,
+    ``add``, or for running compile/lint with a custom timeout when the
+    dedicated tools time out.
+
+    Examples:
+      - command="translate", args=["english"]  -> generate/refresh English
+        translation files (creates block-translation skeletons).
+      - command="compile"  -> same as tool_compile_project.
+      - command="lint"     -> same as tool_lint_project.
+
+    Args:
+        project_path: Absolute path to the Ren'Py project root directory.
+        command: Ren'Py CLI subcommand (e.g. "compile", "lint", "translate").
+        args: Extra arguments after the command (e.g. ["english"] for translate).
+        timeout: Override default timeout (seconds). Default via
+            RENPY_MCP_TIMEOUT env var or 180.
+
+    Returns:
+        dict with {ok, returncode, raw_output, errors}.
+    """
+    return run_renpy_command(project_path, command, args, timeout)
 
 
 def main():

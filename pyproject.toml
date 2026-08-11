@@ -1,6 +1,6 @@
 [project]
 name = "renpy-mcp"
-version = "0.3.0"
+version = "0.4.0"
 description = "Ren'Py MCP Server - AI Agent bridge for Ren'Py visual novel development"
 readme = "README.md"
 license = {text = "MIT"}

@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.4.0] — 2026-08-11
+
+### Added
+- `list_translations` tool — list all languages under `game/tl/` with per-language file count, dialogue block-translation count, string-translation entry count, GUI file completeness, and the project source language (`config.language`)
+- `check_translation` tool — deep-check translation coverage. Key detection: a translation file that only has `translate <lang> strings:` (old/new) but NO `translate <lang> <hash>:` block translations — Ren'Py does NOT translate say-statement dialogue via string translation, so such files leave dialogue silently in the source language. Also detects duplicate `old` strings (runtime error), untranslated blocks, and source files with dialogue that have no translation file
+- `check_language_picker` tool — verify `screens.rpy` language picker: catches an "English" button miswired to `Language(None)` (show source text) instead of `Language("english")` (apply translation) when the source language is not English, dead buttons pointing at non-existent `tl/` folders, and missing buttons for available translations
+- `run_renpy` tool — generic escape hatch to run any Ren'Py CLI subcommand (compile / lint / translate / rtc / etc.) with a custom timeout; useful for `translate english` (generate/refresh translation files) or as a fallback when dedicated tools time out
+- `RENPY_MCP_TIMEOUT` environment variable — configure build command timeout (default 180s)
+- `translation.py` module — translation analysis (read-only, never modifies translation files)
+- Precise dialogue detection: counts only defined `Character` variable names as dialogue speakers, so screen/style property lines like `color "#fff"` or `key "K_SPACE"` are not mistaken for dialogue
+
+### Fixed
+- `build.py` subprocess now uses `stdin=DEVNULL` to prevent hangs when Ren'Py waits on stdin in headless contexts
+- Build command timeout increased from 120s to 180s and made configurable via `RENPY_MCP_TIMEOUT`
+
+### Changed
+- Tool count: 15 → 19
+- `build.py` — added public `run_renpy_command()` function shared by dedicated tools and the generic `run_renpy` tool
+- `README.md` / `README.en.md` — documented 4 new tools, new translation-debugging workflow, and design notes
+
 ## [0.3.0] — 2026-08-08
 
 ### Added

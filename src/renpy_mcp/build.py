@@ -193,6 +193,82 @@ def _delete_save_files(saves_dir: str, pattern: str = "*") -> list[str]:
     return deleted
 
 
+def _default_timeout() -> int:
+    """Build command timeout, overridable via RENPY_MCP_TIMEOUT env var."""
+    try:
+        return int(os.environ.get("RENPY_MCP_TIMEOUT", "180"))
+    except ValueError:
+        return 180
+
+
+def run_renpy_command(
+    project_path: str,
+    command: str,
+    args: list[str] | None = None,
+    timeout: int | None = None,
+) -> dict:
+    """Run an arbitrary Ren'Py CLI command and return parsed output.
+
+    This is the generic escape hatch for Ren'Py CLI subcommands that don't
+    have a dedicated wrapper -- e.g. ``translate`` (generate/refresh
+    translation files), ``rtc`` (reload), ``add`` (add a launcher action), or
+    even ``compile``/``lint`` when you want a custom timeout.
+
+    Args:
+        project_path: Absolute path to the Ren'Py project root directory.
+        command: Ren'Py CLI subcommand, e.g. "compile", "lint", "translate".
+        args: Extra arguments appended after the command (e.g. ["english"]
+            for ``translate english``).
+        timeout: Override the default timeout (seconds). None = env/default.
+
+    Returns:
+        {ok: bool, returncode: int, raw_output: str, errors: [...]}
+    """
+    try:
+        python_exe = get_python_exe()
+        renpy_script = get_renpy_script()
+    except FileNotFoundError as e:
+        return {"ok": False, "returncode": -1, "raw_output": str(e), "errors": [{"message": str(e)}]}
+
+    cmd = [python_exe, renpy_script, project_path, command]
+    if args:
+        cmd.extend(args)
+
+    to = timeout if timeout is not None else _default_timeout()
+    try:
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=False,
+            timeout=to,
+            cwd=os.path.dirname(renpy_script),
+            stdin=subprocess.DEVNULL,
+        )
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "returncode": -1, "raw_output": "",
+                "errors": [{"message": f"Command timed out ({to}s): {' '.join(cmd)}"}]}
+    except FileNotFoundError:
+        return {"ok": False, "returncode": -1, "raw_output": "",
+                "errors": [{"message": f"Python executable not found: {python_exe}"}]}
+
+    try:
+        out = result.stdout.decode("utf-8", errors="replace")
+        err = result.stderr.decode("utf-8", errors="replace")
+    except Exception:
+        import locale
+        pref = locale.getpreferredencoding(False) or "utf-8"
+        out = result.stdout.decode(pref, errors="replace")
+        err = result.stderr.decode(pref, errors="replace")
+    output = out + "\n" + err
+
+    return {
+        "ok": result.returncode == 0,
+        "returncode": result.returncode,
+        "raw_output": output,
+        "errors": _parse_compile_errors(output) if command == "compile" else [],
+    }
+
+
 def _run_renpy_command(project_path: str, command: str) -> dict:
     """Execute a Ren'Py CLI command and parse output."""
     try:
@@ -208,11 +284,12 @@ def _run_renpy_command(project_path: str, command: str) -> dict:
             cmd,
             capture_output=True,
             text=False,
-            timeout=120,
+            timeout=_default_timeout(),
             cwd=os.path.dirname(renpy_script),
+            stdin=subprocess.DEVNULL,
         )
     except subprocess.TimeoutExpired:
-        return {"ok": False, "errors": [{"message": "Command timed out (120s)"}], "raw_output": ""}
+        return {"ok": False, "errors": [{"message": "Command timed out (180s)"}], "raw_output": ""}
     except FileNotFoundError:
         return {"ok": False, "errors": [{"message": f"Python executable not found: {python_exe}"}], "raw_output": ""}
 

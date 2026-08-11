@@ -31,8 +31,10 @@ Ren'Py 没有内置编辑器，开发者手动写 `.rpy` 文本文件再点「�
 | 写代码 | 往任意 .rpy 文件注入代码（8 种定位模式），自动建文件，保留 BOM |
 | 编译验证 | 编译 + lint 一次跑完，返回结构化错误（文件名 + 行号 + 消息） |
 | 自动修复 | 检测并修复 5 类常见问题：`return True/False`、缺 `from` 子句、BOM 不一致、漏标签、陈旧存档 |
+| **翻译检查** | **列出所有语言 / 深度检查翻译覆盖（抓"只有字符串翻译、缺块翻译"的静默 bug）/ 校验语言选择器配置** |
 | 存档管理 | 列出 / 清除 / 清除陈旧存档（修复 `Could not find return label` 报错） |
 | 素材管理 | 拷贝图片 / 字体 / 音频到项目，获取图片尺寸算立绘定位 |
+| 通用 CLI | 直接跑任意 Ren'Py 子命令（compile/lint/translate 等），自定义超时 |
 | 跨平台 | Windows / macOS / Linux 全支持，SDK 路径自动探测 |
 
 **核心流程：**
@@ -54,11 +56,13 @@ Ren'Py 没有内置编辑器，开发者手动写 `.rpy` 文本文件再点「�
                        ▼
 ┌──────────────────────────────────────────────┐
 │              renpy-mcp Server                  │
-│              (FastMCP, 15 个工具)               │
+│              (FastMCP, 19 个工具)               │
 ├──────────┬──────────┬──────────┬──────────────┤
 │  读代码   │  写代码   │  验证修复  │   文档知识库   │
 │ (4 tools)│ (1 tool) │ (5 tools)│  (2 tools)  │
 ├──────────┴──────────┴──────────┴──────────────┤
+│   翻译检查(3)  通用CLI(1)  存档(1)  素材(2)      │
+├───────────────────────────────────────────────┤
 │                  底层能力                       │
 │  ┌─────────┐  ┌──────────┐  ┌───────────────┐  │
 │  │ 正则解析 │  │ 文件读写  │  │ subprocess    │  │
@@ -81,9 +85,10 @@ renpy-mcp/
 │   ├── server.py              # MCP 服务入口 + 工具注册
 │   ├── project.py             # 标签解析：list_labels / read_script / find_references / list_definitions
 │   ├── executor.py            # 代码注入：exec_rpy（8种定位 + CJK字体）
-│   ├── build.py               # 编译验证：compile / lint / check_project / manage_saves
+│   ├── build.py               # 编译验证：compile / lint / check_project / manage_saves / run_renpy_command
 │   ├── fixer.py               # 自动修复：auto_fix（5类修复器）
 │   ├── assets.py              # 素材管理：copy_asset / get_image_size
+│   ├── translation.py         # 翻译检查：list_translations / check_translation / check_language_picker
 │   ├── docs_search.py         # 文档搜索：search_docs / list_doc_pages
 │   ├── config.py              # SDK 路径配置（跨平台自动探测）
 │   └── docs/                  # 内置官方文档（23页，580KB）
@@ -194,7 +199,7 @@ python -m venv .venv
 
 ---
 
-## 📡 15 个工具一览
+## 📡 19 个工具一览
 
 ### 读代码（4 个）
 
@@ -256,6 +261,20 @@ python -m venv .venv
 | `search_docs` | 搜索内置 Ren'Py 中文官方文档（23 页），返回相关段落 |
 | `list_doc_pages` | 列出所有可用文档页面 |
 
+### 翻译检查（3 个）
+
+| 工具 | 功能 |
+|------|------|
+| `list_translations` | 列出 `game/tl/` 下所有语言，报告每个语言的文件数、对话块翻译数、字符串翻译条目数、GUI 文件齐全度，以及源语言（`config.language`） |
+| `check_translation` | 深度检查翻译覆盖。**核心检测**：某翻译文件只有 `translate <lang> strings:`（old/new）却没有 `translate <lang> <hash>:` 块翻译——Ren'Py 对话只认块翻译，字符串翻译不翻译对话，这种文件会让对话静默停留在源语言。还检测：重复 `old` 字符串（运行时报错）、未翻译的块、有对话却缺翻译文件的源文件 |
+| `check_language_picker` | 校验 `screens.rpy` 语言选择器：检测"English"按钮误用 `Language(None)`（显示源文本）而非 `Language("english")`（应用翻译）、指向不存在 `tl/` 文件夹的死按钮、已有翻译却缺按钮的情况 |
+
+### 通用 CLI（1 个）
+
+| 工具 | 功能 |
+|------|------|
+| `run_renpy` | 直接跑任意 Ren'Py CLI 子命令（compile / lint / translate / rtc 等），自定义超时。用于生成/刷新翻译文件（`translate english`）或编译超时时换一条路 |
+
 ---
 
 ## 📝 典型工作流
@@ -292,6 +311,19 @@ find_references("chapter_03")   → 没人调 = 死代码
 find_references("typo_label")   → defined=False = 有 jump 指向不存在的标签
 ```
 
+### 场景 5：多语言翻译排查（"选了 English 还是中文"）
+
+```text
+list_translations()        → 看有哪些语言、每个语言翻译了多少
+check_translation("english") → 抓"只有字符串翻译缺块翻译"的静默 bug
+                             + 重复 old 字符串 + 缺翻译文件的源文件
+check_language_picker()    → 校验"English"按钮是否误用 Language(None)
+run_renpy("translate",["english"]) → 重新生成块翻译骨架
+```
+
+> **真实案例**：一个章节的翻译文件被写成了字符串翻译格式（`old`/`new`），编译不报错，
+> 但游戏里对话全是源语言——因为 Ren'Py 对话只认块翻译。`check_translation` 一眼就能抓到。
+
 ---
 
 ## 💡 设计说明
@@ -302,6 +334,9 @@ find_references("typo_label")   → defined=False = 有 jump 指向不存在的�
 - **SDK 自动探测**：未设 `RENPY_SDK_PATH` 时自动扫描常见路径，按修改时间取最新
 - **修改类修复器保留 BOM**：写入时检测原文件是否有 BOM，有则保留
 - **只读检查器不改代码**：`missing_labels` 和 `stale_saves` 只报告不修改
+- **编译不卡死**：subprocess 加 `stdin=DEVNULL`，超时可用 `RENPY_SDK_PATH` 环境变量旁的 `RENPY_MCP_TIMEOUT` 调整（默认 180s）
+- **翻译检查只读**：`check_translation` / `check_language_picker` 只分析报告，绝不改你的翻译文件
+- **对话识别精准**：统计源文件对话时只认已定义的 `Character` 变量名，不会把 `color "#fff"`、`key "K_SPACE"` 这类界面/样式属性行误判成对话
 
 ---
 
